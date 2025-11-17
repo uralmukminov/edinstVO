@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import FSInputFile
 
-TOKEN = "ТОКЕН_ОТ_BOTFATHER"  # вставь свой токен
+TOKEN = "8239212075:AAG9lZCatLghF9bHddO5xCZejlHFykBLStY"  # вставь свой токен
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -138,3 +138,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
