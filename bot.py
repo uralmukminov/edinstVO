@@ -44,7 +44,7 @@ def save_stats():
 @dp.message(Command("start"))
 async def ask_name(message: types.Message):
     user_id = message.from_user.id
-    unique_started.add(user_id)   # считаем уникальных начавших
+    unique_started.add(user_id)
     save_stats()
     await message.answer("Привет! Напиши, как тебя зовут 👇")
     user_state[user_id] = -1
@@ -70,12 +70,15 @@ async def export_stats(message: types.Message):
 
 # ------------------- Викторина -------------------
 
-@dp.message(~Command())   # ⚠️ общий обработчик только для НЕ команд
+@dp.message()
 async def handle_message(message: types.Message):
+    # если это команда (начинается с "/"), игнорируем
+    if message.text.startswith("/"):
+        return
+
     user_id = message.from_user.id
     idx = user_state.get(user_id, -1)
 
-    # если ждём имя
     if idx == -1:
         user_name[user_id] = message.text
         user_state[user_id] = 0
@@ -84,7 +87,6 @@ async def handle_message(message: types.Message):
         await send_question(user_id)
         return
 
-    # если идёт викторина
     if idx < len(questions):
         q = questions[idx]
         correct_option = q["options"][q["answer"][0]]
@@ -117,11 +119,9 @@ async def send_question(user_id: int):
             reply_markup=types.ReplyKeyboardRemove()
         )
 
-        # добавляем в список закончивших
         unique_finished.add(user_id)
         save_stats()
 
-        # отправляем сертификат через FSInputFile
         certificate = FSInputFile("certificate.png")
         await bot.send_photo(
             user_id,
@@ -138,4 +138,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
