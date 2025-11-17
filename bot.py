@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import FSInputFile
 
-TOKEN = "8239212075:AAG9lZCatLghF9bHddO5xCZejlHFykBLStY"  # вставь свой токен
+TOKEN = "ТОКЕН_ОТ_BOTFATHER"  # вставь свой токен
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -39,6 +39,8 @@ def save_stats():
             "finished": list(unique_finished)
         }, f, ensure_ascii=False, indent=2)
 
+# ------------------- Команды -------------------
+
 @dp.message(Command("start"))
 async def ask_name(message: types.Message):
     user_id = message.from_user.id
@@ -47,7 +49,28 @@ async def ask_name(message: types.Message):
     await message.answer("Привет! Напиши, как тебя зовут 👇")
     user_state[user_id] = -1
 
-@dp.message()
+@dp.message(Command("stats"))
+async def show_stats(message: types.Message):
+    await message.answer(
+        f"📊 Статистика:\n"
+        f"Начали: {len(unique_started)} участников\n"
+        f"Закончили: {len(unique_finished)} участников"
+    )
+
+@dp.message(Command("export"))
+async def export_stats(message: types.Message):
+    if os.path.exists(STATS_FILE):
+        await bot.send_document(
+            message.from_user.id,
+            document=FSInputFile(STATS_FILE),
+            caption="📊 Файл статистики участников"
+        )
+    else:
+        await message.answer("Файл статистики пока не создан.")
+
+# ------------------- Викторина -------------------
+
+@dp.message(~Command())   # ⚠️ общий обработчик только для НЕ команд
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
     idx = user_state.get(user_id, -1)
@@ -108,24 +131,7 @@ async def send_question(user_id: int):
 
         user_state[user_id] = -1
 
-@dp.message(Command("stats"))
-async def show_stats(message: types.Message):
-    await message.answer(
-        f"📊 Статистика:\n"
-        f"Начали: {len(unique_started)} участников\n"
-        f"Закончили: {len(unique_finished)} участников"
-    )
-
-@dp.message(Command("export"))
-async def export_stats(message: types.Message):
-    if os.path.exists(STATS_FILE):
-        await bot.send_document(
-            message.from_user.id,
-            document=FSInputFile(STATS_FILE),
-            caption="📊 Файл статистики участников"
-        )
-    else:
-        await message.answer("Файл статистики пока не создан.")
+# ------------------- Запуск -------------------
 
 async def main():
     await dp.start_polling(bot)
