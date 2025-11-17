@@ -1,7 +1,9 @@
 import asyncio
 import json
+import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.types import FSInputFile
 
 TOKEN = "8239212075:AAG9lZCatLghF9bHddO5xCZejlHFykBLStY"  # вставь свой токен
 
@@ -16,10 +18,34 @@ user_state = {}
 user_score = {}
 user_name = {}
 
+# Файл для статистики
+STATS_FILE = "stats.json"
+
+# Загружаем статистику из файла (если есть)
+if os.path.exists(STATS_FILE):
+    with open(STATS_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        unique_started = set(data.get("started", []))
+        unique_finished = set(data.get("finished", []))
+else:
+    unique_started = set()
+    unique_finished = set()
+
+def save_stats():
+    """Сохраняем статистику в файл"""
+    with open(STATS_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            "started": list(unique_started),
+            "finished": list(unique_finished)
+        }, f, ensure_ascii=False, indent=2)
+
 @dp.message(Command("start"))
 async def ask_name(message: types.Message):
+    user_id = message.from_user.id
+    unique_started.add(user_id)   # считаем уникальных начавших
+    save_stats()
     await message.answer("Привет! Напиши, как тебя зовут 👇")
-    user_state[message.from_user.id] = -1  # ждём имя
+    user_state[user_id] = -1
 
 @dp.message()
 async def handle_message(message: types.Message):
@@ -62,22 +88,44 @@ async def send_question(user_id: int):
         score = user_score[user_id]
         name = user_name.get(user_id, "Участник")
 
-        # Убираем клавиатуру
         await bot.send_message(
             user_id,
             f"🎉 Викторина закончена!\n{name}, ты набрал {score} из {len(questions)}.",
             reply_markup=types.ReplyKeyboardRemove()
         )
 
-        # Отправляем сертификат-картинку
+        # добавляем в список закончивших
+        unique_finished.add(user_id)
+        save_stats()
+
+        # отправляем сертификат через FSInputFile
+        certificate = FSInputFile("certificate.png")
         await bot.send_photo(
             user_id,
-            photo=open("certificate.png", "rb"),
+            photo=certificate,
             caption=f"🎓 Сертификат участника\n{name}\nРезультат: {score}/{len(questions)}"
         )
 
-        # Сброс состояния
         user_state[user_id] = -1
+
+@dp.message(Command("stats"))
+async def show_stats(message: types.Message):
+    await message.answer(
+        f"📊 Статистика:\n"
+        f"Начали: {len(unique_started)} участников\n"
+        f"Закончили: {len(unique_finished)} участников"
+    )
+
+@dp.message(Command("export"))
+async def export_stats(message: types.Message):
+    if os.path.exists(STATS_FILE):
+        await bot.send_document(
+            message.from_user.id,
+            document=FSInputFile(STATS_FILE),
+            caption="📊 Файл статистики участников"
+        )
+    else:
+        await message.answer("Файл статистики пока не создан.")
 
 async def main():
     await dp.start_polling(bot)
