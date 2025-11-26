@@ -122,7 +122,7 @@ async def send_question(user_id: int):
         unique_finished.add(user_id)
         save_stats()
 
-        certificate = FSInputFile("certificate.png")
+        certificate = FSInputFile("certificate1.png")
         await bot.send_photo(
             user_id,
             photo=certificate,
@@ -138,3 +138,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
