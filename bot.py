@@ -72,21 +72,41 @@ async def export_stats(message: types.Message):
 
 @dp.message()
 async def handle_message(message: types.Message):
-    # если это команда (начинается с "/"), игнорируем
     if message.text.startswith("/"):
         return
 
     user_id = message.from_user.id
-    idx = user_state.get(user_id, -1)
+    idx = user_state.get(user_id, None)
 
-    if idx == -1:
-        user_name[user_id] = message.text
-        user_state[user_id] = 0
-        user_score[user_id] = 0
-        await message.answer(f"Отлично, {message.text}! Начнём викторину 🎲")
-        await send_question(user_id)
+    if idx is None:
+        await message.answer("Сначала напиши /start")
         return
 
+    # если ждём имя
+    if idx == -1:
+        if user_id not in user_name:
+            user_name[user_id] = message.text
+            user_state[user_id] = 0
+            user_score[user_id] = 0
+            await message.answer(f"Отлично, {message.text}! Начнём викторину 🎲")
+            await send_question(user_id)
+        else:
+            await message.answer("Ты уже ввёл имя, продолжай викторину 👇")
+        return
+
+    # если ждём решение о перезапуске
+    if idx == -2:
+        if message.text.lower() == "да":
+            user_state[user_id] = 0
+            user_score[user_id] = 0
+            await message.answer("🚀 Начинаем заново!")
+            await send_question(user_id)
+        else:
+            await message.answer("Хорошо 👍 Викторина завершена.")
+            user_state[user_id] = None
+        return
+
+    # если идёт викторина
     if idx < len(questions):
         q = questions[idx]
         correct_option = q["options"][q["answer"][0]]
@@ -104,10 +124,16 @@ async def send_question(user_id: int):
     idx = user_state[user_id]
     if idx < len(questions):
         q = questions[idx]
+        options = q.get("options", [])
+
         keyboard = types.ReplyKeyboardMarkup(
-            keyboard=[[types.KeyboardButton(text=opt)] for opt in q["options"]],
-            resize_keyboard=True
+            resize_keyboard=True,
+            one_time_keyboard=True,
+            input_field_placeholder="Выбери вариант 👇"
         )
+        for opt in options:
+            keyboard.add(types.KeyboardButton(text=opt))
+
         await bot.send_message(user_id, q["question"], reply_markup=keyboard)
     else:
         score = user_score[user_id]
@@ -122,14 +148,27 @@ async def send_question(user_id: int):
         unique_finished.add(user_id)
         save_stats()
 
-        certificate = FSInputFile("certificate1.png")
+        certificate = FSInputFile("certificate_v2.png")  # или certificate.png
         await bot.send_photo(
             user_id,
             photo=certificate,
             caption=f"🎓 Сертификат участника\n{name}\nРезультат: {score}/{len(questions)}"
         )
 
-        user_state[user_id] = -1
+        # 👉 предлагаем пройти заново
+        restart_keyboard = types.ReplyKeyboardMarkup(
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
+        restart_keyboard.add("Да", "Нет")
+
+        await bot.send_message(
+            user_id,
+            "Хочешь пройти викторину заново?",
+            reply_markup=restart_keyboard
+        )
+
+        user_state[user_id] = -2  # спец. состояние "ожидание ответа на перезапуск"
 
 # ------------------- Запуск -------------------
 
@@ -138,4 +177,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
